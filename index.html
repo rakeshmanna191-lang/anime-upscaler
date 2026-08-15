@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anime Upscaler</title>
+<style>
+  :root {
+    --bg: #0d0d12;
+    --card: #16161f;
+    --accent: #8b5cf6;
+    --accent2: #06b6d4;
+    --text: #e8e8f0;
+    --muted: #8888a0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 10%, #1a1030 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--card);
+    border: 1px solid #2a2a3a;
+    border-radius: 20px;
+    padding: 28px 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  p.sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 24px;
+  }
+  .drop {
+    border: 2px dashed #3a3a4d;
+    border-radius: 16px;
+    padding: 36px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .drop:active, .drop.dragover {
+    border-color: var(--accent);
+    background: rgba(139,92,246,0.08);
+  }
+  .drop svg { width: 40px; height: 40px; color: var(--accent); margin-bottom: 10px; }
+  .drop .label { font-size: 15px; font-weight: 600; }
+  .drop .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  input[type=file] { display: none; }
+
+  .status {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .status.active { display: block; }
+  .spinner {
+    width: 34px; height: 34px;
+    border: 3px solid #2a2a3a;
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 14px;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-text { font-size: 14px; color: var(--text); }
+  .status-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  .bar-track {
+    height: 6px;
+    background: #2a2a3a;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s;
+  }
+
+  .result { display: none; margin-top: 20px; }
+  .result.active { display: block; }
+  video {
+    width: 100%;
+    border-radius: 12px;
+    background: #000;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    text-decoration: none;
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    color: white;
+  }
+  .btn.secondary {
+    background: transparent;
+    border: 1px solid #3a3a4d;
+    color: var(--text);
+    margin-top: 8px;
+  }
+  .error {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 10px;
+    color: #f87171;
+    font-size: 13px;
+  }
+  .error.active { display: block; }
+  .lock {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+  }
+  .lock input {
+    background: var(--card);
+    border: 1px solid #3a3a4d;
+    color: var(--text);
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 15px;
+    width: 100%;
+    max-width: 280px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div id="lockScreen" class="lock">
+  <h1>🔒 Anime Upscaler</h1>
+  <p class="sub">Enter password to continue</p>
+  <input type="password" id="pwInput" placeholder="Password" autocomplete="off">
+  <button class="btn" style="max-width:280px" onclick="checkPassword()">Unlock</button>
+  <div class="error" id="pwError">Wrong password</div>
+</div>
+
+<div class="card" id="mainCard" style="display:none;">
+  <h1>Anime Upscaler</h1>
+  <p class="sub">Upload a short anime clip. Quality upscaling happens automatically.</p>
+
+  <div class="drop" id="dropZone">
+    <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0-3 3m3-3 3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" /></svg>
+    <div class="label">Tap to upload video</div>
+    <div class="hint">MP4 · keep clips short (under ~5 sec) for best results</div>
+    <input type="file" id="fileInput" accept="video/mp4,video/*">
+  </div>
+
+  <div class="status" id="statusBox">
+    <div class="spinner"></div>
+    <div class="status-text" id="statusText">Uploading...</div>
+    <div class="status-sub" id="statusSub">This can take a minute, please keep this tab open</div>
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+  </div>
+
+  <div class="error" id="errorBox"></div>
+
+  <div class="result" id="resultBox">
+    <video id="resultVideo" controls playsinline></video>
+    <a class="btn" id="downloadBtn" download="upscaled.mp4">⬇ Export / Download</a>
+    <button class="btn secondary" onclick="resetAll()">Upscale another clip</button>
+  </div>
+</div>
+
+<script type="module">
+  // ---- simple privacy lock (client-side only, casual protection) ----
+  const SITE_PASSWORD = "anicrush123"; // change this to whatever you like
+  window.checkPassword = function() {
+    const val = document.getElementById('pwInput').value;
+    if (val === SITE_PASSWORD) {
+      document.getElementById('lockScreen').style.display = 'none';
+      document.getElementById('mainCard').style.display = 'block';
+      sessionStorage.setItem('unlocked', '1');
+    } else {
+      document.getElementById('pwError').classList.add('active');
+    }
+  };
+  if (sessionStorage.getItem('unlocked') === '1') {
+    document.getElementById('lockScreen').style.display = 'none';
+    document.getElementById('mainCard').style.display = 'block';
+  }
+  document.getElementById('pwInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') window.checkPassword();
+  });
+
+  // ---- upscaler logic ----
+  import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+  const statusBox = document.getElementById('statusBox');
+  const statusText = document.getElementById('statusText');
+  const statusSub = document.getElementById('statusSub');
+  const barFill = document.getElementById('barFill');
+  const errorBox = document.getElementById('errorBox');
+  const resultBox = document.getElementById('resultBox');
+  const resultVideo = document.getElementById('resultVideo');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  window.resetAll = function() {
+    resultBox.classList.remove('active');
+    errorBox.classList.remove('active');
+    statusBox.classList.remove('active');
+    dropZone.style.display = 'block';
+    fileInput.value = '';
+  };
+
+  function setProgress(pct, text, sub) {
+    barFill.style.width = pct + '%';
+    if (text) statusText.textContent = text;
+    if (sub) statusSub.textContent = sub;
+  }
+
+  async function handleFile(file) {
+    errorBox.classList.remove('active');
+    resultBox.classList.remove('active');
+    dropZone.style.display = 'none';
+    statusBox.classList.add('active');
+    setProgress(10, 'Uploading video...', 'Sending your clip to the upscaler');
+
+    try {
+      const client = await Client.connect("r3gm/video_upscaler");
+      setProgress(30, 'Processing...', 'AI is enhancing frame by frame — this can take 1-3 minutes');
+
+      const result = await client.predict("/start_upscaler", {
+        video_file: file,
+        upscaler_name: "R-ESRGAN AnimeVideo",
+        as_gif: false,
+        speed_factor: 1.0,
+        half_precision: true,
+        tile: 192,
+        tile_overlap: 8,
+        upscaler_factor: 2.0,
+        workers: 8,
+      });
+
+      setProgress(90, 'Finishing up...', 'Preparing your download');
+
+      const outData = result.data[0];
+      const videoUrl = outData.url || (outData.path ? outData.path : null);
+
+      if (!videoUrl) throw new Error("No output returned from upscaler.");
+
+      setProgress(100, 'Done!', '');
+      resultVideo.src = videoUrl;
+      downloadBtn.href = videoUrl;
+      statusBox.classList.remove('active');
+      resultBox.classList.add('active');
+
+    } catch (err) {
+      console.error(err);
+      statusBox.classList.remove('active');
+      dropZone.style.display = 'block';
+      errorBox.textContent = "Upscaling failed: " + (err.message || "the service may be busy or your clip is too long/large. Try a shorter clip (under 5 seconds, under 1024x1024).");
+      errorBox.classList.add('active');
+    }
+  }
+</script>
+
+</body>
+</html>
