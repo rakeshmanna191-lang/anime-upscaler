@@ -254,21 +254,39 @@
     statusBox.classList.add('active');
     setProgress(10, 'Uploading video...', 'Sending your clip to the upscaler');
 
-    try {
-      const client = await Client.connect("r3gm/video_upscaler");
-      setProgress(30, 'Processing...', 'AI is enhancing frame by frame — this can take 1-3 minutes');
+    const SPACES = ["mushroom2508/video_upscaler", "kramp/video-upscaler", "r3gm/video_upscaler"];
+    let result = null;
+    let lastError = null;
 
-      const result = await client.predict("/start_upscaler", {
-        video_file: file,
-        upscaler_name: "R-ESRGAN AnimeVideo",
-        as_gif: false,
-        speed_factor: 1.0,
-        half_precision: true,
-        tile: 192,
-        tile_overlap: 8,
-        upscaler_factor: 2.0,
-        workers: 8,
-      });
+    try {
+      for (const spaceName of SPACES) {
+        try {
+          setProgress(20, 'Connecting...', 'Reaching the upscaling service (' + spaceName + ')');
+          const client = await Client.connect(spaceName);
+          setProgress(30, 'Processing...', 'AI is enhancing frame by frame — this can take 1-3 minutes');
+
+          result = await client.predict("/start_upscaler", {
+            video_file: file,
+            upscaler_name: "R-ESRGAN AnimeVideo",
+            as_gif: false,
+            speed_factor: 1.0,
+            half_precision: true,
+            tile: 192,
+            tile_overlap: 8,
+            upscaler_factor: 2.0,
+            workers: 8,
+          });
+          break; // success, stop trying other spaces
+        } catch (innerErr) {
+          console.warn("Space failed: " + spaceName, innerErr);
+          lastError = innerErr;
+          result = null;
+        }
+      }
+
+      if (!result) {
+        throw lastError || new Error("All upscaling services are currently unavailable.");
+      }
 
       setProgress(90, 'Finishing up...', 'Preparing your download');
 
@@ -295,3 +313,4 @@
 
 </body>
 </html>
+
